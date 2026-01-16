@@ -4,6 +4,22 @@
 
 ---
 
+##
+```bash
+export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/9/include"
+sudo apt install gcc-10 g++-10
+export CC=gcc-10
+export CXX=g++-10
+cargo build --bin server --release
+# 進入前端目錄
+cd frontend && pnpm install && pnpm run build && cd ..
+
+# 開發模式啟動（指定端口）
+VITE_BACKEND_URL=http://localhost:9999 pnpm run dev -- --port 3000 --host 0.0.0.0
+
+HOST=0.0.0.0 PORT=9998 RUST_LOG=debug ./target/release/server
+```
+
 ## ⚠️ 重要概念：Debug vs Release 資料目錄差異
 
 ### 為什麼 Debug 版本看不到原有設定？
