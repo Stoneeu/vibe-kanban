@@ -34,6 +34,7 @@ use crate::container::LocalContainerService;
 mod command;
 pub mod container;
 mod copy;
+pub mod loop_tracker;
 
 #[derive(Clone)]
 pub struct LocalDeployment {

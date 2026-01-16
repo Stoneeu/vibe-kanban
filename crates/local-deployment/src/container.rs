@@ -34,9 +34,9 @@ use executors::{
     },
     approvals::{ExecutorApprovalService, NoopExecutorApprovalService},
     env::ExecutionEnv,
-    executors::{BaseCodingAgent, ExecutorExitResult, ExecutorExitSignal, InterruptSender},
+    executors::{BaseCodingAgent, CodingAgent, ExecutorExitResult, ExecutorExitSignal, InterruptSender},
     logs::{NormalizedEntryType, utils::patch::extract_normalized_entry_from_patch},
-    profile::ExecutorProfileId,
+    profile::{ExecutorConfigs, ExecutorProfileId},
 };
 use futures::{FutureExt, TryStreamExt, stream::select};
 use serde_json::json;
@@ -62,7 +62,10 @@ use utils::{
 };
 use uuid::Uuid;
 
-use crate::{command, copy};
+use crate::{
+    command, copy,
+    loop_tracker::{CopilotLoopTracker, check_completion_promise},
+};
 
 #[derive(Clone)]
 pub struct LocalContainerService {
@@ -78,6 +81,8 @@ pub struct LocalContainerService {
     queued_message_service: QueuedMessageService,
     publisher: Result<SharePublisher, RemoteClientNotConfigured>,
     notification_service: NotificationService,
+    /// Tracker for Copilot loop states
+    loop_tracker: CopilotLoopTracker,
 }
 
 impl LocalContainerService {
@@ -96,6 +101,7 @@ impl LocalContainerService {
         let child_store = Arc::new(RwLock::new(HashMap::new()));
         let interrupt_senders = Arc::new(RwLock::new(HashMap::new()));
         let notification_service = NotificationService::new(config.clone());
+        let loop_tracker = CopilotLoopTracker::new();
 
         let container = LocalContainerService {
             db,
@@ -110,6 +116,7 @@ impl LocalContainerService {
             queued_message_service,
             publisher,
             notification_service,
+            loop_tracker,
         };
 
         container.spawn_workspace_cleanup();
@@ -466,7 +473,10 @@ impl LocalContainerService {
                     }
                 }
 
-                if container.should_finalize(&ctx) {
+                // Check for Copilot loop continuation before finalizing
+                let copilot_loop_continued = container.handle_copilot_loop(&ctx, &exec_id).await;
+
+                if !copilot_loop_continued && container.should_finalize(&ctx) {
                     // Only execute queued messages if the execution succeeded
                     // If it failed or was killed, just clear the queue and finalize
                     let should_execute_queued = !matches!(
@@ -863,6 +873,221 @@ impl LocalContainerService {
         )
         .await
     }
+
+    /// Try to register Copilot loop state if the action is a Copilot initial request with loop enabled.
+    async fn try_register_copilot_loop(
+        &self,
+        workspace_id: Uuid,
+        executor_action: &ExecutorAction,
+        container_ref: Option<&str>,
+    ) {
+        // Only handle initial coding agent requests
+        let ExecutorActionType::CodingAgentInitialRequest(initial_request) = &executor_action.typ else {
+            return;
+        };
+
+        // Check if this is a Copilot executor
+        if initial_request.executor_profile_id.executor != BaseCodingAgent::Copilot {
+            return;
+        }
+
+        // Get the Copilot configuration
+        let Some(coding_agent) = ExecutorConfigs::get_cached()
+            .get_coding_agent(&initial_request.executor_profile_id)
+        else {
+            return;
+        };
+
+        // Extract Copilot-specific settings
+        let CodingAgent::Copilot(copilot) = coding_agent else {
+            return;
+        };
+
+        // Check if loop is enabled
+        if !copilot.loop_enabled.unwrap_or(false) {
+            return;
+        }
+
+        // Get loop configuration
+        let max_iterations = copilot.max_iterations.unwrap_or(5).min(100).max(1);
+        let completion_promise = copilot.completion_promise.clone();
+
+        // Build working_dir from container_ref and relative path
+        let working_dir = match (&initial_request.working_dir, container_ref) {
+            (Some(rel), Some(base)) => Some(format!("{}/{}", base, rel)),
+            (None, Some(base)) => Some(base.to_string()),
+            _ => None,
+        };
+
+        tracing::info!(
+            "Registering Copilot loop for workspace {}: max_iterations={}, completion_promise={:?}",
+            workspace_id,
+            max_iterations,
+            completion_promise
+        );
+
+        // Register the loop state (session_id will be updated later from MsgStore)
+        self.loop_tracker
+            .register(
+                workspace_id,
+                max_iterations,
+                completion_promise,
+                initial_request.prompt.clone(),
+                String::new(), // Session ID will be extracted from MsgStore during follow-up
+                initial_request.executor_profile_id.clone(),
+                working_dir,
+            )
+            .await;
+    }
+
+    /// Handle Copilot loop logic: check completion promise and spawn follow-up if needed.
+    /// Returns true if a follow-up was started, false otherwise.
+    async fn handle_copilot_loop(
+        &self,
+        ctx: &ExecutionContext,
+        exec_id: &Uuid,
+    ) -> bool {
+        // Check if we have an active loop for this workspace
+        if !self.loop_tracker.has_active_loop(&ctx.workspace.id).await {
+            return false;
+        }
+
+        // Get execution output to check for completion promise
+        let output = self.get_execution_output(exec_id);
+
+        // Get completion promise for this workspace
+        if let Some(completion_promise) = self.loop_tracker.get_completion_promise(&ctx.workspace.id).await {
+            if check_completion_promise(&output, &completion_promise) {
+                tracing::info!(
+                    "Copilot loop complete: completion promise detected for workspace {}",
+                    ctx.workspace.id
+                );
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+                return false;
+            }
+        }
+
+        // Check if we can continue with another iteration
+        if !self.loop_tracker.increment_and_check(&ctx.workspace.id).await {
+            tracing::info!(
+                "Copilot loop complete: max iterations reached for workspace {}",
+                ctx.workspace.id
+            );
+            self.loop_tracker.remove(&ctx.workspace.id).await;
+            return false;
+        }
+
+        // Get loop state for follow-up
+        let Some(state) = self.loop_tracker.get(&ctx.workspace.id).await else {
+            return false;
+        };
+
+        // Extract session_id from MsgStore (more reliable than stored value)
+        let session_id = match self.get_session_id_from_msg_store(exec_id) {
+            Some(id) => id,
+            None => {
+                tracing::error!(
+                    "Failed to get session ID from MsgStore for Copilot loop follow-up (workspace {})",
+                    ctx.workspace.id
+                );
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+                return false;
+            }
+        };
+
+        // Build follow-up action
+        let follow_up_prompt = state.build_follow_up_prompt();
+        let action_type = ExecutorActionType::CodingAgentFollowUpRequest(CodingAgentFollowUpRequest {
+            prompt: follow_up_prompt,
+            session_id,
+            executor_profile_id: state.executor_profile_id.clone(),
+            working_dir: state.working_dir.clone(),
+        });
+
+        let repos = match WorkspaceRepo::find_repos_for_workspace(&self.db.pool, ctx.workspace.id).await {
+            Ok(repos) => repos,
+            Err(e) => {
+                tracing::error!("Failed to get repos for Copilot loop follow-up: {}", e);
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+                return false;
+            }
+        };
+        let cleanup_action = self.cleanup_actions_for_repos(&repos);
+
+        let action = ExecutorAction::new(action_type, cleanup_action.map(Box::new));
+
+        tracing::info!(
+            "Starting Copilot loop follow-up for workspace {} (iteration {})",
+            ctx.workspace.id,
+            state.iteration
+        );
+
+        match self.start_execution(
+            &ctx.workspace,
+            &ctx.session,
+            &action,
+            &ExecutionProcessRunReason::CodingAgent,
+        ).await {
+            Ok(_) => true,
+            Err(e) => {
+                tracing::error!("Failed to start Copilot loop follow-up: {}", e);
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+                false
+            }
+        }
+    }
+
+    /// Get execution output as a string for completion promise checking
+    fn get_execution_output(&self, exec_id: &Uuid) -> String {
+        let msg_stores = match self.msg_stores.try_read() {
+            Ok(stores) => stores,
+            Err(_) => return String::new(),
+        };
+
+        let Some(msg_store) = msg_stores.get(exec_id) else {
+            return String::new();
+        };
+
+        let history = msg_store.get_history();
+        let mut output = String::new();
+
+        for msg in history.iter() {
+            match msg {
+                LogMsg::Stdout(s) => output.push_str(s),
+                LogMsg::JsonPatch(patch) => {
+                    if let Some((_, entry)) = extract_normalized_entry_from_patch(patch) {
+                        if matches!(entry.entry_type, NormalizedEntryType::AssistantMessage) {
+                            output.push_str(&entry.content);
+                            output.push('\n');
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        output
+    }
+
+    /// Extract session ID from MsgStore history for a given execution
+    fn get_session_id_from_msg_store(&self, exec_id: &Uuid) -> Option<String> {
+        let msg_stores = match self.msg_stores.try_read() {
+            Ok(stores) => stores,
+            Err(_) => return None,
+        };
+
+        let msg_store = msg_stores.get(exec_id)?;
+        let history = msg_store.get_history();
+
+        // Find the SessionId message in history
+        for msg in history.iter() {
+            if let LogMsg::SessionId(session_id) = msg {
+                return Some(session_id.clone());
+            }
+        }
+
+        None
+    }
 }
 
 fn failure_exit_status() -> std::process::ExitStatus {
@@ -1121,6 +1346,14 @@ impl ContainerService for LocalContainerService {
             self.add_interrupt_sender(execution_process.id, interrupt_sender)
                 .await;
         }
+
+        // Register Copilot loop state if applicable
+        self.try_register_copilot_loop(
+            workspace.id,
+            executor_action,
+            workspace.container_ref.as_ref().map(|s| s.as_str()),
+        )
+        .await;
 
         // Spawn unified exit monitor: watches OS exit and optional executor signal
         let _hn = self.spawn_exit_monitor(&execution_process.id, spawned.exit_signal);
