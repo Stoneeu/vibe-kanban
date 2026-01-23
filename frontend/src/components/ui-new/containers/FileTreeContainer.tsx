@@ -5,6 +5,7 @@ import {
   filterFileTree,
   getExpandedPathsForSearch,
   getAllFolderPaths,
+  sortDiffs,
 } from '@/utils/fileTreeUtils';
 import { usePersistedCollapsedPaths } from '@/stores/useUiPreferencesStore';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
@@ -12,10 +13,10 @@ import { useChangesView } from '@/contexts/ChangesViewContext';
 import type { Diff } from 'shared/types';
 
 interface FileTreeContainerProps {
-  workspaceId?: string;
+  workspaceId: string;
   diffs: Diff[];
-  onSelectFile?: (path: string, diff: Diff) => void;
-  className?: string;
+  onSelectFile: (path: string, diff: Diff) => void;
+  className: string;
 }
 
 export function FileTreeContainer({
@@ -36,8 +37,13 @@ export function FileTreeContainer({
     showGitHubComments,
     setShowGitHubComments,
     getGitHubCommentCountForFile,
+    getFilesWithGitHubComments,
+    getFirstCommentLineForFile,
     isGitHubCommentsLoading,
   } = useWorkspaceContext();
+
+  // Get selectFile from context to pass line number when navigating
+  const { selectFile } = useChangesView();
 
   // Sync selectedPath with fileInView from context and scroll into view
   useEffect(() => {
@@ -118,11 +124,54 @@ export function FileTreeContainer({
       setSelectedPath(path);
       // Find the diff for this path
       const diff = diffs.find((d) => d.newPath === path || d.oldPath === path);
-      if (diff && onSelectFile) {
+      if (diff) {
         onSelectFile(path, diff);
       }
     },
     [diffs, onSelectFile]
+  );
+
+  // Get list of diff paths that have GitHub comments, sorted to match visual order
+  const filesWithComments = useMemo(() => {
+    const ghFiles = getFilesWithGitHubComments();
+    // Sort diffs first to match visual order, then filter to those with comments
+    return sortDiffs(diffs)
+      .map((d) => d.newPath || d.oldPath || '')
+      .filter((diffPath) =>
+        ghFiles.some(
+          (ghPath) => diffPath === ghPath || diffPath.endsWith('/' + ghPath)
+        )
+      );
+  }, [getFilesWithGitHubComments, diffs]);
+
+  // Navigate between files with GitHub comments
+  const handleNavigateComments = useCallback(
+    (direction: 'prev' | 'next') => {
+      if (filesWithComments.length === 0) return;
+
+      const currentIndex = selectedPath
+        ? filesWithComments.indexOf(selectedPath)
+        : -1;
+      let nextIndex: number;
+
+      if (direction === 'next') {
+        nextIndex =
+          currentIndex < filesWithComments.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex =
+          currentIndex > 0 ? currentIndex - 1 : filesWithComments.length - 1;
+      }
+
+      const targetPath = filesWithComments[nextIndex];
+      const lineNumber = getFirstCommentLineForFile(targetPath);
+
+      // Update local state
+      setSelectedPath(targetPath);
+
+      // Select file with line number to scroll to the comment
+      selectFile(targetPath, lineNumber ?? undefined);
+    },
+    [filesWithComments, selectedPath, getFirstCommentLineForFile, selectFile]
   );
 
   return (
@@ -142,6 +191,8 @@ export function FileTreeContainer({
       onToggleGitHubComments={setShowGitHubComments}
       getGitHubCommentCountForFile={getGitHubCommentCountForFile}
       isGitHubCommentsLoading={isGitHubCommentsLoading}
+      onNavigateComments={handleNavigateComments}
+      hasFilesWithComments={filesWithComments.length > 0}
     />
   );
 }

@@ -29,12 +29,18 @@
     "create": "생성",
     "delete": "삭제",
     "disconnect": "연결 해제",
+    "discard": "취소",
     "edit": "편집",
     "manage": "관리",
     "replay": "다시 재생",
     "reset": "초기화",
     "save": "저장",
-    "send": "보내기"
+    "send": "보내기",
+    "addItem": "항목 추가"
+  },
+  "form": {
+    "notSpecified": "지정되지 않음",
+    "selectOption": "옵션 선택..."
   },
   "conversation": {
     "args": "인자",
@@ -134,6 +140,10 @@
     "viewArchive": "보관함 보기",
     "backToActive": "활성으로 돌아가기",
     "noArchived": "보관된 워크스페이스 없음",
+    "noWorkspaces": "워크스페이스 없음",
+    "needsAttention": "주의 필요",
+    "idle": "대기 중",
+    "running": "실행 중",
     "pin": "고정",
     "unpin": "고정 해제",
     "archive": "보관",
@@ -152,7 +162,9 @@
     "noResults": "일치하는 파일 없음",
     "title": "파일",
     "showGitHubComments": "GitHub 댓글 표시",
-    "hideGitHubComments": "GitHub 댓글 숨기기"
+    "hideGitHubComments": "GitHub 댓글 숨기기",
+    "prevGitHubComment": "이전 댓글 파일",
+    "nextGitHubComment": "다음 댓글 파일"
   },
   "sections": {
     "changes": "변경사항",
@@ -165,7 +177,13 @@
     "workingBranch": "작업 브랜치",
     "recent": "최근",
     "other": "기타",
-    "devServerPreview": "개발 서버 미리보기"
+    "devServerPreview": "개발 서버 미리보기",
+    "terminal": "터미널",
+    "notes": "노트"
+  },
+  "notes": {
+    "placeholder": "이 워크스페이스에 대한 노트 추가...",
+    "selectWorkspace": "노트를 보려면 워크스페이스를 선택하세요"
   },
   "repos": {
     "loading": "저장소 로딩 중...",
@@ -183,16 +201,22 @@
     "repoSettings": "저장소 설정",
     "cancel": "취소",
     "saveChanges": "변경사항 저장",
-    "copied": "복사됨"
+    "copied": "복사됨",
+    "collapse": "접기"
   },
   "comments": {
     "addReviewComment": "리뷰 코멘트 추가",
     "addPlaceholder": "코멘트 추가...",
-    "editPlaceholder": "코멘트 편집..."
+    "editPlaceholder": "코멘트 편집...",
+    "copyToReview": "리뷰로 복사"
   },
   "confirm": {
     "defaultConfirm": "확인",
     "defaultCancel": "취소"
+  },
+  "dialogs": {
+    "selectGitRepository": "Git 저장소 선택",
+    "chooseExistingRepo": "파일 시스템에서 기존 저장소를 선택하세요"
   },
   "empty": {
     "noChanges": "표시할 변경사항이 없습니다"
@@ -203,7 +227,8 @@
     "defaultPlaceholder": "명령어를 입력하거나 검색..."
   },
   "chatBox": {
-    "variants": "변형"
+    "variants": "변형",
+    "customise": "사용자 지정"
   },
   "projects": {
     "noProjectFound": "프로젝트를 찾을 수 없습니다",
@@ -274,10 +299,17 @@
     "selectProcessToView": "로그를 보려면 프로세스를 선택하세요"
   },
   "processes": {
-    "noProcesses": "프로세스 없음"
+    "noProcesses": "프로세스 없음",
+    "terminal": "터미널"
   },
   "search": {
     "matchCount": "{{current}} / {{total}}",
     "noMatches": "일치 항목 없음"
+  },
+  "contextUsage": {
+    "label": "컨텍스트 사용량",
+    "emptyTooltip": "컨텍스트 사용량은 다음 응답 후에 표시됩니다",
+    "tooltip": "컨텍스트: {{percentage}}% · {{used}} / {{total}} 토큰",
+    "ariaLabel": "컨텍스트 사용량: {{percentage}}%"
   }
 }

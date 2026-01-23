@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDropzone } from 'react-dropzone';
 import {
   type Session,
   type ToolStatus,
@@ -10,7 +12,7 @@ import { useExecutionProcesses } from '@/hooks/useExecutionProcesses';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { useApprovalFeedbackOptional } from '@/contexts/ApprovalFeedbackContext';
 import { useMessageEditContext } from '@/contexts/MessageEditContext';
-import { useEntries } from '@/contexts/EntriesContext';
+import { useEntries, useTokenUsage } from '@/contexts/EntriesContext';
 import { useReviewOptional } from '@/contexts/ReviewProvider';
 import { useActions } from '@/contexts/ActionsContext';
 import { useTodos } from '@/hooks/useTodos';
@@ -58,47 +60,71 @@ function computeExecutionStatus(params: {
   return 'idle';
 }
 
-interface SessionChatBoxContainerProps {
-  /** The current session */
-  session?: Session;
-  /** Task ID for execution tracking */
-  taskId?: string;
-  /** Number of files changed in current session */
-  filesChanged?: number;
-  /** Number of lines added */
-  linesAdded?: number;
-  /** Number of lines removed */
-  linesRemoved?: number;
+/** Shared props across all modes */
+interface SharedProps {
   /** Available sessions for this workspace */
-  sessions?: Session[];
-  /** Called when a session is selected */
-  onSelectSession?: (sessionId: string) => void;
+  sessions: Session[];
   /** Project ID for file search in typeahead */
-  projectId?: string;
-  /** Whether user is creating a new session */
-  isNewSessionMode?: boolean;
-  /** Callback to start new session mode */
-  onStartNewSession?: () => void;
-  /** Workspace ID for creating new sessions */
-  workspaceId?: string;
+  projectId: string | undefined;
+  /** Number of files changed in current session */
+  filesChanged: number;
+  /** Number of lines added */
+  linesAdded: number;
+  /** Number of lines removed */
+  linesRemoved: number;
 }
 
-export function SessionChatBoxContainer({
-  session,
-  taskId,
-  filesChanged,
-  linesAdded,
-  linesRemoved,
-  sessions = [],
-  onSelectSession,
-  projectId,
-  isNewSessionMode = false,
-  onStartNewSession,
-  workspaceId: propWorkspaceId,
-}: SessionChatBoxContainerProps) {
-  const workspaceId = propWorkspaceId ?? session?.workspace_id;
+/** Props for existing session mode */
+interface ExistingSessionProps extends SharedProps {
+  mode: 'existing-session';
+  /** The current session */
+  session: Session;
+  /** Called when a session is selected */
+  onSelectSession: (sessionId: string) => void;
+  /** Callback to start new session mode */
+  onStartNewSession: (() => void) | undefined;
+}
+
+/** Props for new session mode */
+interface NewSessionProps extends SharedProps {
+  mode: 'new-session';
+  /** Workspace ID for creating new sessions */
+  workspaceId: string;
+  /** Called when a session is selected */
+  onSelectSession: (sessionId: string) => void;
+}
+
+/** Props for placeholder mode (no workspace selected) */
+interface PlaceholderProps extends SharedProps {
+  mode: 'placeholder';
+}
+
+type SessionChatBoxContainerProps =
+  | ExistingSessionProps
+  | NewSessionProps
+  | PlaceholderProps;
+
+export function SessionChatBoxContainer(props: SessionChatBoxContainerProps) {
+  const { mode, sessions, projectId, filesChanged, linesAdded, linesRemoved } =
+    props;
+
+  // Extract mode-specific values
+  const session = mode === 'existing-session' ? props.session : undefined;
+  const workspaceId =
+    mode === 'existing-session'
+      ? props.session.workspace_id
+      : mode === 'new-session'
+        ? props.workspaceId
+        : undefined;
+  const isNewSessionMode = mode === 'new-session';
+  const onSelectSession =
+    mode === 'placeholder' ? undefined : props.onSelectSession;
+  const onStartNewSession =
+    mode === 'existing-session' ? props.onStartNewSession : undefined;
+
   const sessionId = session?.id;
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { executeAction } = useActions();
   const actionCtx = useActionVisibilityContext();
@@ -115,6 +141,7 @@ export function SessionChatBoxContainer({
 
   // Get entries early to extract pending approval for scratch key
   const { entries } = useEntries();
+  const tokenUsageInfo = useTokenUsage();
 
   // Extract pending approval metadata from entries (needed for scratchId)
   const pendingApproval = useMemo(() => {
@@ -150,7 +177,7 @@ export function SessionChatBoxContainer({
 
   // Execution state
   const { isAttemptRunning, stopExecution, isStopping, processes } =
-    useAttemptExecution(workspaceId, taskId);
+    useAttemptExecution(workspaceId);
 
   // Approval feedback context
   const feedbackContext = useApprovalFeedbackOptional();
@@ -161,7 +188,7 @@ export function SessionChatBoxContainer({
   const isInEditMode = editContext.isInEditMode;
 
   // Get todos from entries
-  const { inProgressTodo } = useTodos(entries);
+  const { todos, inProgressTodo } = useTodos(entries);
 
   // Review comments context (optional - only available when ReviewProvider wraps this)
   const reviewContext = useReviewOptional();
@@ -258,6 +285,26 @@ export function SessionChatBoxContainer({
   const { uploadFiles, localImages, clearUploadedImages } =
     useSessionAttachments(workspaceId, handleInsertMarkdown);
 
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const imageFiles = acceptedFiles.filter((f) =>
+        f.type.startsWith('image/')
+      );
+      if (imageFiles.length > 0) {
+        uploadFiles(imageFiles);
+      }
+    },
+    [uploadFiles]
+  );
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    disabled: mode === 'placeholder' || isAttemptRunning,
+    noClick: true,
+    noKeyboard: true,
+  });
+
   // Executor/variant selection
   const {
     effectiveExecutor,
@@ -282,6 +329,11 @@ export function SessionChatBoxContainer({
     },
     [setVariantFromHook, saveToScratch, localMessage]
   );
+
+  // Navigate to agent settings to customise variants
+  const handleCustomise = useCallback(() => {
+    navigate('/settings/agents');
+  }, [navigate]);
 
   // Queue interaction
   const {
@@ -364,6 +416,11 @@ export function SessionChatBoxContainer({
     cancelDebouncedSave();
     await saveToScratch(localMessage, selectedVariant);
     await queueMessage(combinedMessage, selectedVariant);
+
+    // Clear local state after queueing (same as handleSend)
+    setLocalMessage('');
+    clearUploadedImages();
+    reviewContext?.clearComments();
   }, [
     localMessage,
     reviewMarkdown,
@@ -371,6 +428,9 @@ export function SessionChatBoxContainer({
     queueMessage,
     cancelDebouncedSave,
     saveToScratch,
+    setLocalMessage,
+    clearUploadedImages,
+    reviewContext,
   ]);
 
   // Editor change handler
@@ -413,6 +473,14 @@ export function SessionChatBoxContainer({
   const handleCancelFeedback = useCallback(() => {
     feedbackContext?.exitFeedbackMode();
   }, [feedbackContext]);
+
+  // Handle cancel queue - restore message to editor
+  const handleCancelQueue = useCallback(async () => {
+    if (queuedMessage) {
+      setLocalMessage(queuedMessage);
+    }
+    await cancelQueue();
+  }, [queuedMessage, setLocalMessage, cancelQueue]);
 
   // Message edit retry mutation
   const editRetryMutation = useMessageEditRetry(sessionId ?? '', () => {
@@ -556,17 +624,14 @@ export function SessionChatBoxContainer({
     localMessage,
   ]);
 
-  // Render placeholder state if no session and not in new session mode
-  // This maintains the visual structure during workspace transitions
-  const isPlaceholderMode = !session && !isNewSessionMode;
-
   // In placeholder mode, render a disabled version to maintain visual structure
-  if (isPlaceholderMode) {
+  if (mode === 'placeholder') {
     return (
       <SessionChatBox
         status="idle"
         workspaceId={workspaceId}
         projectId={projectId}
+        tokenUsageInfo={tokenUsageInfo}
         editor={{
           value: '',
           onChange: () => {},
@@ -601,6 +666,7 @@ export function SessionChatBoxContainer({
       onViewCode={handleViewCode}
       workspaceId={workspaceId}
       projectId={projectId}
+      tokenUsageInfo={tokenUsageInfo}
       editor={{
         value: editorValue,
         onChange: handleEditorChange,
@@ -608,7 +674,7 @@ export function SessionChatBoxContainer({
       actions={{
         onSend: handleSend,
         onQueue: handleQueueMessage,
-        onCancelQueue: cancelQueue,
+        onCancelQueue: handleCancelQueue,
         onStop: stopExecution,
         onPasteFiles: uploadFiles,
       }}
@@ -616,6 +682,7 @@ export function SessionChatBoxContainer({
         selected: selectedVariant,
         options: variantOptions,
         onChange: setSelectedVariant,
+        onCustomise: handleCustomise,
       }}
       session={{
         sessions,
@@ -638,6 +705,7 @@ export function SessionChatBoxContainer({
       }}
       error={sendError}
       agent={latestProfileId?.executor}
+      todos={todos}
       inProgressTodo={inProgressTodo}
       executor={
         isNewSessionMode
@@ -688,6 +756,7 @@ export function SessionChatBoxContainer({
           : undefined
       }
       localImages={localImages}
+      dropzone={{ getRootProps, getInputProps, isDragActive }}
     />
   );
 }

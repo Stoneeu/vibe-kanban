@@ -12,7 +12,13 @@
     "connect": "Connect",
     "disconnect": "Disconnect",
     "close": "Close",
-    "replay": "Replay"
+    "replay": "Replay",
+    "discard": "Discard",
+    "addItem": "Add Item"
+  },
+  "form": {
+    "notSpecified": "Not specified",
+    "selectOption": "Select an option..."
   },
   "states": {
     "loading": "Loading...",
@@ -134,6 +140,10 @@
     "viewArchive": "View Archive",
     "backToActive": "Back to Active",
     "noArchived": "No archived workspaces",
+    "noWorkspaces": "No workspaces",
+    "needsAttention": "Needs Attention",
+    "idle": "Idle",
+    "running": "Running",
     "pin": "Pin",
     "unpin": "Unpin",
     "archive": "Archive",
@@ -152,7 +162,9 @@
     "noResults": "No matching files",
     "title": "Files",
     "showGitHubComments": "Show GitHub comments",
-    "hideGitHubComments": "Hide GitHub comments"
+    "hideGitHubComments": "Hide GitHub comments",
+    "prevGitHubComment": "Previous file with comments",
+    "nextGitHubComment": "Next file with comments"
   },
   "sections": {
     "changes": "Changes",
@@ -165,7 +177,13 @@
     "workingBranch": "Working Branch",
     "recent": "Recent",
     "other": "Other",
-    "devServerPreview": "Dev Server Preview"
+    "devServerPreview": "Dev Server Preview",
+    "terminal": "Terminal",
+    "notes": "Notes"
+  },
+  "notes": {
+    "placeholder": "Add notes about this workspace...",
+    "selectWorkspace": "Select a workspace to view notes"
   },
   "repos": {
     "loading": "Loading repositories...",
@@ -183,16 +201,22 @@
     "repoSettings": "Repository settings",
     "cancel": "Cancel",
     "saveChanges": "Save Changes",
-    "copied": "Copied"
+    "copied": "Copied",
+    "collapse": "Collapse"
   },
   "comments": {
     "addReviewComment": "Add Review Comment",
     "addPlaceholder": "Add a comment...",
-    "editPlaceholder": "Edit comment..."
+    "editPlaceholder": "Edit comment...",
+    "copyToReview": "Copy to review"
   },
   "confirm": {
     "defaultConfirm": "Confirm",
     "defaultCancel": "Cancel"
+  },
+  "dialogs": {
+    "selectGitRepository": "Select Git Repository",
+    "chooseExistingRepo": "Choose an existing repository from your file system"
   },
   "empty": {
     "noChanges": "No changes to display"
@@ -203,7 +227,8 @@
     "defaultPlaceholder": "Type a command or search..."
   },
   "chatBox": {
-    "variants": "Variants"
+    "variants": "Variants",
+    "customise": "Customise"
   },
   "projects": {
     "noProjectFound": "No project found",
@@ -274,10 +299,17 @@
     "selectProcessToView": "Select a process to view logs"
   },
   "processes": {
-    "noProcesses": "No processes"
+    "noProcesses": "No processes",
+    "terminal": "Terminal"
   },
   "search": {
     "matchCount": "{{current}} of {{total}}",
     "noMatches": "No matches"
+  },
+  "contextUsage": {
+    "label": "Context usage",
+    "emptyTooltip": "Context usage appears after the next reply",
+    "tooltip": "Context: {{percentage}}% · {{used}} / {{total}} tokens",
+    "ariaLabel": "Context usage: {{percentage}}%"
   }
 }

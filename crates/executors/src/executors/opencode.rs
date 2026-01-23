@@ -5,6 +5,7 @@ use command_group::AsyncCommandGroup;
 use derivative::Derivative;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use tokio::{io::AsyncBufReadExt, process::Command};
 use ts_rs::TS;
 use workspace_utils::msg_store::MsgStore;
@@ -15,7 +16,7 @@ use crate::{
     env::ExecutionEnv,
     executors::{
         AppendPrompt, AvailabilityInfo, ExecutorError, ExecutorExitResult, SpawnedChild,
-        StandardCodingAgentExecutor,
+        StandardCodingAgentExecutor, opencode::types::OpencodeExecutorEvent,
     },
     stdout_dup::create_stdout_pipe_writer,
 };
@@ -24,7 +25,7 @@ mod normalize_logs;
 mod sdk;
 mod types;
 
-use sdk::{LogWriter, RunConfig, run_session};
+use sdk::{LogWriter, RunConfig, generate_server_password, run_session};
 
 #[derive(Derivative, Clone, Serialize, Deserialize, TS, JsonSchema)]
 #[derivative(Debug, PartialEq)]
@@ -33,6 +34,8 @@ pub struct Opencode {
     pub append_prompt: AppendPrompt,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "agent")]
     pub mode: Option<String>,
     /// Auto-approve agent actions
@@ -48,7 +51,7 @@ pub struct Opencode {
 
 impl Opencode {
     fn build_command_builder(&self) -> Result<CommandBuilder, CommandBuildError> {
-        let builder = CommandBuilder::new("npx -y opencode-ai@1.1.3")
+        let builder = CommandBuilder::new("npx -y opencode-ai@1.1.25")
             // Pass hostname/port as separate args so OpenCode treats them as explicitly set
             // (it checks `process.argv.includes(\"--port\")` / `\"--hostname\"`).
             .extend_params(["serve", "--hostname", "127.0.0.1", "--port", "0"]);
@@ -67,6 +70,8 @@ impl Opencode {
         let command_parts = self.build_command_builder()?.build_initial()?;
         let (program_path, args) = command_parts.into_resolved().await?;
 
+        let server_password = generate_server_password();
+
         let mut command = Command::new(program_path);
         command
             .kill_on_drop(true)
@@ -76,7 +81,8 @@ impl Opencode {
             .current_dir(current_dir)
             .args(&args)
             .env("NODE_NO_WARNINGS", "1")
-            .env("NO_COLOR", "1");
+            .env("NO_COLOR", "1")
+            .env("OPENCODE_SERVER_PASSWORD", &server_password);
 
         env.clone()
             .with_profile(&self.cmd)
@@ -95,26 +101,45 @@ impl Opencode {
         let (exit_signal_tx, exit_signal_rx) = tokio::sync::oneshot::channel();
         let (interrupt_tx, interrupt_rx) = tokio::sync::oneshot::channel();
 
+        // Prepare config values that will be moved into the spawned task
         let directory = current_dir.to_string_lossy().to_string();
-        let base_url = wait_for_server_url(server_stdout).await?;
         let approvals = if self.auto_approve {
             None
         } else {
             self.approvals.clone()
         };
-
-        let config = RunConfig {
-            base_url,
-            directory,
-            prompt: combined_prompt,
-            resume_session_id: resume_session.map(|s| s.to_string()),
-            model: self.model.clone(),
-            agent: self.mode.clone(),
-            approvals,
-            auto_approve: self.auto_approve,
-        };
+        let model = self.model.clone();
+        let model_variant = self.variant.clone();
+        let agent = self.mode.clone();
+        let auto_approve = self.auto_approve;
+        let resume_session_id = resume_session.map(|s| s.to_string());
 
         tokio::spawn(async move {
+            // Wait for server to print listening URL
+            let base_url = match wait_for_server_url(server_stdout, log_writer.clone()).await {
+                Ok(url) => url,
+                Err(err) => {
+                    let _ = log_writer
+                        .log_error(format!("OpenCode startup error: {err}"))
+                        .await;
+                    let _ = exit_signal_tx.send(ExecutorExitResult::Failure);
+                    return;
+                }
+            };
+
+            let config = RunConfig {
+                base_url,
+                directory,
+                prompt: combined_prompt,
+                resume_session_id,
+                model,
+                model_variant,
+                agent,
+                approvals,
+                auto_approve,
+                server_password,
+            };
+
             let result = run_session(config, log_writer.clone(), interrupt_rx).await;
             let exit_result = match result {
                 Ok(()) => ExecutorExitResult::Success,
@@ -148,7 +173,10 @@ fn format_tail(captured: Vec<String>) -> String {
         .join("\n")
 }
 
-async fn wait_for_server_url(stdout: tokio::process::ChildStdout) -> Result<String, ExecutorError> {
+async fn wait_for_server_url(
+    stdout: tokio::process::ChildStdout,
+    log_writer: LogWriter,
+) -> Result<String, ExecutorError> {
     let mut lines = tokio::io::BufReader::new(stdout).lines();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(180);
     let mut captured: Vec<String> = Vec::new();
@@ -172,6 +200,12 @@ async fn wait_for_server_url(stdout: tokio::process::ChildStdout) -> Result<Stri
             Ok(Err(err)) => return Err(ExecutorError::Io(err)),
             Err(_) => continue,
         };
+
+        log_writer
+            .log_event(&OpencodeExecutorEvent::StartupLog {
+                message: line.clone(),
+            })
+            .await?;
 
         if captured.len() < 64 {
             captured.push(line.clone());
@@ -200,7 +234,7 @@ impl StandardCodingAgentExecutor for Opencode {
         prompt: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let env = setup_approvals_env(self.auto_approve, env);
+        let env = setup_permissions_env(self.auto_approve, env);
         self.spawn_inner(current_dir, prompt, None, &env).await
     }
 
@@ -211,7 +245,7 @@ impl StandardCodingAgentExecutor for Opencode {
         session_id: &str,
         env: &ExecutionEnv,
     ) -> Result<SpawnedChild, ExecutorError> {
-        let env = setup_approvals_env(self.auto_approve, env);
+        let env = setup_permissions_env(self.auto_approve, env);
         self.spawn_inner(current_dir, prompt, Some(session_id), &env)
             .await
     }
@@ -253,10 +287,34 @@ fn default_to_true() -> bool {
     true
 }
 
-fn setup_approvals_env(auto_approve: bool, env: &ExecutionEnv) -> ExecutionEnv {
+fn setup_permissions_env(auto_approve: bool, env: &ExecutionEnv) -> ExecutionEnv {
     let mut env = env.clone();
-    if !auto_approve && !env.contains_key("OPENCODE_PERMISSION") {
-        env.insert("OPENCODE_PERMISSION", r#"{"edit": "ask", "bash": "ask", "webfetch": "ask", "doom_loop": "ask", "external_directory": "ask"}"#);
-    }
+
+    let permissions = match env.get("OPENCODE_PERMISSION") {
+        Some(existing) => merge_question_deny(existing),
+        None => build_default_permissions(auto_approve),
+    };
+
+    env.insert("OPENCODE_PERMISSION", &permissions);
     env
+}
+
+fn build_default_permissions(auto_approve: bool) -> String {
+    if auto_approve {
+        r#"{"question":"deny"}"#.to_string()
+    } else {
+        r#"{"edit":"ask","bash":"ask","webfetch":"ask","doom_loop":"ask","external_directory":"ask","question":"deny"}"#.to_string()
+    }
+}
+
+fn merge_question_deny(existing_json: &str) -> String {
+    let mut permissions: Map<String, serde_json::Value> =
+        serde_json::from_str(existing_json.trim()).unwrap_or_default();
+
+    permissions.insert(
+        "question".to_string(),
+        serde_json::Value::String("deny".to_string()),
+    );
+
+    serde_json::to_string(&permissions).unwrap_or_else(|_| r#"{"question":"deny"}"#.to_string())
 }

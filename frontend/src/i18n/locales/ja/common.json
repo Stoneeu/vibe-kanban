@@ -29,12 +29,18 @@
     "create": "作成",
     "delete": "削除",
     "disconnect": "切断",
+    "discard": "破棄",
     "edit": "編集",
     "manage": "管理",
     "replay": "再生",
     "reset": "リセット",
     "save": "保存",
-    "send": "送信"
+    "send": "送信",
+    "addItem": "項目を追加"
+  },
+  "form": {
+    "notSpecified": "指定なし",
+    "selectOption": "オプションを選択..."
   },
   "conversation": {
     "args": "引数",
@@ -134,6 +140,10 @@
     "viewArchive": "アーカイブを表示",
     "backToActive": "アクティブに戻る",
     "noArchived": "アーカイブされたワークスペースはありません",
+    "noWorkspaces": "ワークスペースがありません",
+    "needsAttention": "対応が必要",
+    "idle": "待機中",
+    "running": "実行中",
     "pin": "ピン留め",
     "unpin": "ピン留め解除",
     "archive": "アーカイブ",
@@ -152,7 +162,9 @@
     "noResults": "一致するファイルがありません",
     "title": "ファイル",
     "showGitHubComments": "GitHubコメントを表示",
-    "hideGitHubComments": "GitHubコメントを非表示"
+    "hideGitHubComments": "GitHubコメントを非表示",
+    "prevGitHubComment": "前のコメント付きファイル",
+    "nextGitHubComment": "次のコメント付きファイル"
   },
   "sections": {
     "changes": "変更",
@@ -165,7 +177,13 @@
     "workingBranch": "作業ブランチ",
     "recent": "最近",
     "other": "その他",
-    "devServerPreview": "開発サーバープレビュー"
+    "devServerPreview": "開発サーバープレビュー",
+    "terminal": "ターミナル",
+    "notes": "メモ"
+  },
+  "notes": {
+    "placeholder": "このワークスペースについてメモを追加...",
+    "selectWorkspace": "メモを表示するにはワークスペースを選択してください"
   },
   "repos": {
     "loading": "リポジトリを読み込み中...",
@@ -183,16 +201,22 @@
     "repoSettings": "リポジトリ設定",
     "cancel": "キャンセル",
     "saveChanges": "変更を保存",
-    "copied": "コピーしました"
+    "copied": "コピーしました",
+    "collapse": "折りたたむ"
   },
   "comments": {
     "addReviewComment": "レビューコメントを追加",
     "addPlaceholder": "コメントを追加...",
-    "editPlaceholder": "コメントを編集..."
+    "editPlaceholder": "コメントを編集...",
+    "copyToReview": "レビューにコピー"
   },
   "confirm": {
     "defaultConfirm": "確認",
     "defaultCancel": "キャンセル"
+  },
+  "dialogs": {
+    "selectGitRepository": "Gitリポジトリを選択",
+    "chooseExistingRepo": "ファイルシステムから既存のリポジトリを選択してください"
   },
   "empty": {
     "noChanges": "表示する変更がありません"
@@ -203,7 +227,8 @@
     "defaultPlaceholder": "コマンドを入力または検索..."
   },
   "chatBox": {
-    "variants": "バリアント"
+    "variants": "バリアント",
+    "customise": "カスタマイズ"
   },
   "projects": {
     "noProjectFound": "プロジェクトが見つかりません",
@@ -274,10 +299,17 @@
     "selectProcessToView": "プロセスを選択してログを表示"
   },
   "processes": {
-    "noProcesses": "プロセスがありません"
+    "noProcesses": "プロセスがありません",
+    "terminal": "ターミナル"
   },
   "search": {
     "matchCount": "{{current}} / {{total}}",
     "noMatches": "一致なし"
+  },
+  "contextUsage": {
+    "label": "コンテキスト使用量",
+    "emptyTooltip": "コンテキスト使用量は次の返信後に表示されます",
+    "tooltip": "コンテキスト: {{percentage}}% · {{used}} / {{total}} tokens",
+    "ariaLabel": "コンテキスト使用量: {{percentage}}%"
   }
 }

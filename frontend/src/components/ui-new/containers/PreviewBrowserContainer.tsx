@@ -20,22 +20,20 @@ import {
 import { useLogStream } from '@/hooks/useLogStream';
 import { useUiPreferencesStore } from '@/stores/useUiPreferencesStore';
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext';
-import { useNavigate } from 'react-router-dom';
 import { ScriptFixerDialog } from '@/components/dialogs/scripts/ScriptFixerDialog';
 
 const MIN_RESPONSIVE_WIDTH = 320;
 const MIN_RESPONSIVE_HEIGHT = 480;
 
 interface PreviewBrowserContainerProps {
-  attemptId?: string;
-  className?: string;
+  attemptId: string;
+  className: string;
 }
 
 export function PreviewBrowserContainer({
   attemptId,
   className,
 }: PreviewBrowserContainerProps) {
-  const navigate = useNavigate();
   const previewRefreshKey = useUiPreferencesStore((s) => s.previewRefreshKey);
   const triggerPreviewRefresh = useUiPreferencesStore(
     (s) => s.triggerPreviewRefresh
@@ -82,12 +80,38 @@ export function PreviewBrowserContainer({
   const urlInputRef = useRef<HTMLInputElement>(null);
   const [urlInputValue, setUrlInputValue] = useState(effectiveUrl ?? '');
 
+  // Iframe display timing state
+  const [showIframe, setShowIframe] = useState(false);
+  const [allowManualUrl, setAllowManualUrl] = useState(false);
+
   // Sync from prop only when input is not focused
   useEffect(() => {
     if (document.activeElement !== urlInputRef.current) {
       setUrlInputValue(effectiveUrl ?? '');
     }
   }, [effectiveUrl]);
+
+  // 10-second timeout to enable manual URL entry when no URL detected
+  useEffect(() => {
+    if (!runningDevServers.length) {
+      setAllowManualUrl(false);
+      return;
+    }
+    if (urlInfo?.url) return; // Already have URL
+    const timer = setTimeout(() => setAllowManualUrl(true), 10000);
+    return () => clearTimeout(timer);
+  }, [runningDevServers.length, urlInfo?.url]);
+
+  // 2-second delay before showing iframe after URL detection
+  useEffect(() => {
+    if (!effectiveUrl) {
+      setShowIframe(false);
+      return;
+    }
+    setShowIframe(false);
+    const timer = setTimeout(() => setShowIframe(true), 2000);
+    return () => clearTimeout(timer);
+  }, [effectiveUrl, previewRefreshKey]);
 
   // Responsive resize state - use refs for values that shouldn't trigger re-renders
   const [localDimensions, setLocalDimensions] = useState(responsiveDimensions);
@@ -245,13 +269,18 @@ export function PreviewBrowserContainer({
     []
   );
 
-  const handleUrlInputChange = useCallback(
-    (value: string) => {
-      setUrlInputValue(value);
-      setOverrideUrl(value);
-    },
-    [setOverrideUrl]
-  );
+  const handleUrlInputChange = useCallback((value: string) => {
+    setUrlInputValue(value);
+  }, []);
+
+  const handleUrlSubmit = useCallback(() => {
+    const trimmed = urlInputValue.trim();
+    if (!trimmed || trimmed === urlInfo?.url) {
+      clearOverride();
+    } else {
+      setOverrideUrl(trimmed);
+    }
+  }, [urlInputValue, urlInfo?.url, clearOverride, setOverrideUrl]);
 
   const handleStart = useCallback(() => {
     start();
@@ -294,13 +323,19 @@ export function PreviewBrowserContainer({
     ? `${effectiveUrl}${effectiveUrl.includes('?') ? '&' : '?'}_refresh=${previewRefreshKey}`
     : undefined;
 
-  const handleEditDevScript = () => {
-    if (repos.length === 1) {
-      navigate(`/settings/repos?repoId=${repos[0].id}`);
-    } else {
-      navigate('/settings/repos');
-    }
-  };
+  const handleEditDevScript = useCallback(() => {
+    if (!attemptId || repos.length === 0) return;
+
+    const sessionId = devServerProcesses[0]?.session_id;
+
+    ScriptFixerDialog.show({
+      scriptType: 'dev_server',
+      repos,
+      workspaceId: attemptId,
+      sessionId,
+      initialRepoId: repos.length === 1 ? repos[0].id : undefined,
+    });
+  }, [attemptId, repos, devServerProcesses]);
 
   const handleFixDevScript = useCallback(() => {
     if (!attemptId || repos.length === 0) return;
@@ -325,6 +360,7 @@ export function PreviewBrowserContainer({
       urlInputRef={urlInputRef}
       isUsingOverride={hasOverride}
       onUrlInputChange={handleUrlInputChange}
+      onUrlSubmit={handleUrlSubmit}
       onClearOverride={handleClearOverride}
       onCopyUrl={handleCopyUrl}
       onOpenInNewTab={handleOpenInNewTab}
@@ -334,6 +370,8 @@ export function PreviewBrowserContainer({
       isStarting={isStarting}
       isStopping={isStopping}
       isServerRunning={runningDevServers.length > 0}
+      showIframe={showIframe}
+      allowManualUrl={allowManualUrl}
       screenSize={screenSize}
       localDimensions={localDimensions}
       onScreenSizeChange={handleScreenSizeChange}

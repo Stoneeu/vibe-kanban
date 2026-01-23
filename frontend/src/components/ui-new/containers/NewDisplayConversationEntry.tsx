@@ -6,7 +6,6 @@ import {
   NormalizedEntry,
   ToolStatus,
   TodoItem,
-  type TaskWithAttemptStatus,
   type RepoWithTargetBranch,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
@@ -42,9 +41,8 @@ import type { DiffInput } from '../primitives/conversation/DiffViewCard';
 type Props = {
   entry: NormalizedEntry;
   expansionKey: string;
-  executionProcessId?: string;
-  taskAttempt?: WorkspaceWithSession;
-  task?: TaskWithAttemptStatus;
+  executionProcessId: string;
+  taskAttempt: WorkspaceWithSession;
 };
 
 type FileEditAction = Extract<ActionType, { action: 'file_edit' }>;
@@ -260,7 +258,7 @@ function renderToolUseEntry(
 
 function NewDisplayConversationEntry(props: Props) {
   const { t } = useTranslation('common');
-  const { entry, expansionKey, executionProcessId, taskAttempt, task } = props;
+  const { entry, expansionKey, executionProcessId, taskAttempt } = props;
   const entryType = entry.entry_type;
 
   switch (entryType.type) {
@@ -313,6 +311,10 @@ function NewDisplayConversationEntry(props: Props) {
       // The new design doesn't need the next action bar
       return null;
 
+    case 'token_usage_info':
+      // Displayed in the chat header as the context-usage gauge
+      return null;
+
     case 'user_feedback':
     case 'loading':
       // Fallback to legacy component for these entry types
@@ -322,7 +324,6 @@ function NewDisplayConversationEntry(props: Props) {
           expansionKey={expansionKey}
           executionProcessId={executionProcessId}
           taskAttempt={taskAttempt}
-          task={task}
         />
       );
 
@@ -422,7 +423,7 @@ function PlanEntry({
 }: {
   plan: string;
   expansionKey: string;
-  workspaceId?: string;
+  workspaceId: string | undefined;
   status: ToolStatus;
 }) {
   const { t } = useTranslation('common');
@@ -466,7 +467,7 @@ function GenericToolApprovalEntry({
   toolName: string;
   content: string;
   expansionKey: string;
-  workspaceId?: string;
+  workspaceId: string | undefined;
   status: ToolStatus;
 }) {
   const [expanded, toggle] = usePersistedExpanded(
@@ -497,8 +498,8 @@ function UserMessageEntry({
 }: {
   content: string;
   expansionKey: string;
-  workspaceId?: string;
-  executionProcessId?: string;
+  workspaceId: string | undefined;
+  executionProcessId: string | undefined;
 }) {
   const [expanded, toggle] = usePersistedExpanded(`user:${expansionKey}`, true);
   const { startEdit, isEntryGreyed, isInEditMode } = useMessageEditContext();
@@ -534,7 +535,7 @@ function AssistantMessageEntry({
   workspaceId,
 }: {
   content: string;
-  workspaceId?: string;
+  workspaceId: string | undefined;
 }) {
   return <ChatAssistantMessage content={content} workspaceId={workspaceId} />;
 }
@@ -555,7 +556,7 @@ function ToolSummaryEntry({
   status: ToolStatus;
   content: string;
   toolName: string;
-  command?: string;
+  command: string | undefined;
 }) {
   const [expanded, toggle] = usePersistedExpanded(
     `tool:${expansionKey}`,
@@ -650,8 +651,8 @@ function ScriptEntryWithFix({
   processId: string;
   exitCode: number | null;
   status: ToolStatus;
-  workspaceId?: string;
-  sessionId?: string;
+  workspaceId: string | undefined;
+  sessionId: string | undefined;
 }) {
   // Try to get repos from workspace context - may not be available in all contexts
   let repos: RepoWithTargetBranch[] = [];

@@ -11,7 +11,12 @@ import {
   WarningIcon,
 } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import type { Session, BaseCodingAgent, TodoItem } from 'shared/types';
+import type {
+  BaseCodingAgent,
+  Session,
+  TodoItem,
+  TokenUsageInfo,
+} from 'shared/types';
 import type { LocalImageMetadata } from '@/components/ui/wysiwyg/context/task-attempt-context';
 import { formatDateShortWithTime } from '@/utils/date';
 import { toPrettyCase } from '@/utils/string';
@@ -19,6 +24,7 @@ import { AgentIcon } from '@/components/agents/AgentIcon';
 import {
   ChatBoxBase,
   VisualVariant,
+  type DropzoneProps,
   type EditorProps,
   type VariantProps,
 } from './ChatBoxBase';
@@ -29,13 +35,18 @@ import {
   type ActionVisibilityContext,
   isSpecialIcon,
 } from '../actions';
-import { isActionEnabled } from '../actions/useActionVisibility';
+import {
+  isActionEnabled,
+  getActionTooltip,
+} from '../actions/useActionVisibility';
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from './Dropdown';
 import { type ExecutorProps } from './CreateChatBox';
+import { ContextUsageGauge } from './ContextUsageGauge';
+import { TodoProgressPopup } from './TodoProgressPopup';
 
 // Re-export shared types
 export type { EditorProps, VariantProps } from './ChatBoxBase';
@@ -132,9 +143,12 @@ interface SessionChatBoxProps {
   projectId?: string;
   agent?: BaseCodingAgent | null;
   executor?: ExecutorProps;
+  todos?: TodoItem[];
   inProgressTodo?: TodoItem | null;
   localImages?: LocalImageMetadata[];
   onViewCode?: () => void;
+  tokenUsageInfo?: TokenUsageInfo | null;
+  dropzone?: DropzoneProps;
 }
 
 /**
@@ -158,9 +172,12 @@ export function SessionChatBox({
   projectId,
   agent,
   executor,
+  todos,
   inProgressTodo,
   localImages,
   onViewCode,
+  tokenUsageInfo,
+  dropzone,
 }: SessionChatBoxProps) {
   const { t } = useTranslation('tasks');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -502,6 +519,7 @@ export function SessionChatBox({
       isRunning={showRunningAnimation}
       onPasteFiles={actions.onPasteFiles}
       localImages={localImages}
+      dropzone={dropzone}
       headerLeft={
         <>
           {/* New session mode: agent icon + executor dropdown */}
@@ -534,11 +552,9 @@ export function SessionChatBox({
           {!isNewSessionMode && (
             <>
               {isRunning && inProgressTodo ? (
-                <span className="text-sm flex items-center gap-1">
+                <span className="text-sm flex items-center gap-1 min-w-0">
                   <SpinnerIcon className="size-icon-sm animate-spin flex-shrink-0" />
-                  <span className="truncate max-w-[200px]">
-                    {inProgressTodo.content}
-                  </span>
+                  <span className="truncate">{inProgressTodo.content}</span>
                 </span>
               ) : (
                 <>
@@ -585,6 +601,9 @@ export function SessionChatBox({
           {!isNewSessionMode && (
             <AgentIcon agent={agent} className="size-icon-xl" />
           )}
+          {/* Todo progress popup - always rendered, disabled when no todos */}
+          <TodoProgressPopup todos={todos ?? []} />
+          <ContextUsageGauge tokenUsageInfo={tokenUsageInfo} />
           <ToolbarDropdown
             label={sessionLabel}
             disabled={isInFeedbackMode || isInEditMode || isInApprovalMode}
@@ -630,7 +649,8 @@ export function SessionChatBox({
         <>
           <ToolbarIconButton
             icon={PaperclipIcon}
-            aria-label="Attach file"
+            aria-label={t('tasks:taskFormDialog.attachImage')}
+            title={t('tasks:taskFormDialog.attachImage')}
             onClick={handleAttachClick}
             disabled={isDisabled || isRunning}
           />
@@ -655,11 +675,13 @@ export function SessionChatBox({
               typeof action.label === 'function'
                 ? action.label()
                 : action.label;
+            const tooltip = getActionTooltip(action, toolbarActions.context);
             return (
               <ToolbarIconButton
                 key={action.id}
                 icon={icon}
                 aria-label={label}
+                title={tooltip}
                 onClick={() => toolbarActions.onExecuteAction(action)}
                 disabled={isButtonDisabled}
               />

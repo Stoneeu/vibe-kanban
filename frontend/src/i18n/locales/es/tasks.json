@@ -1,4 +1,8 @@
 {
+  "dropzone": {
+    "dropImagesHere": "Suelta las imágenes aquí",
+    "supportedFormats": "PNG, JPG, GIF, WebP, SVG compatibles"
+  },
   "gitPanel": {
     "create": {
       "warnings": {
@@ -21,9 +25,6 @@
     "attempt": "Attempt",
     "createNewAttempt": "Create new attempt",
     "createSubtask": "Create subtask",
-    "share": "Compartir tarea",
-    "reassign": "Reasignar",
-    "stopShare": "Dejar de compartir",
     "duplicate": "Duplicate",
     "editBranchName": "Editar nombre de rama",
     "gitActions": "Acciones de Git",
@@ -102,41 +103,6 @@
       "filesWithConflicts_other": "{{count}} archivos tienen conflictos",
       "andMore": "...y {{count}} más"
     }
-  },
-  "stopShareDialog": {
-    "title": "Detener uso compartido de la tarea",
-    "description": "¿Detener el uso compartido de \"{{title}}\" con tu organización?",
-    "warning": "Detiene el uso compartido de la tarea con tu organización, pero mantiene tu tarea local.",
-    "confirm": "Dejar de compartir tarea",
-    "inProgress": "Deteniendo el uso compartido...",
-    "genericError": "No se pudo dejar de compartir la tarea. Inténtalo de nuevo."
-  },
-  "shareDialog": {
-    "title": "Compartir tarea",
-    "description": "¿Compartir \"{{title}}\" con tu organización?",
-    "success": "Tarea compartida correctamente.",
-    "genericError": "No se pudo compartir la tarea. Inténtalo de nuevo.",
-    "loadingSystem": "Cargando estado de cuenta…",
-    "loginRequired": {
-      "title": "Inicia sesión para continuar",
-      "description": "Debes iniciar sesión antes de poder compartir tareas. Te redirigiremos a la página de inicio de sesión.",
-      "action": "Ir a iniciar sesión"
-    },
-    "gitProviderRequired": {
-      "title": "Conectar proveedor de Git",
-      "description": "Conecta tu cuenta de proveedor de Git para compartir tareas. Este proyecto debe tener un repositorio remoto.",
-      "action": "Conectar"
-    },
-    "linkProjectRequired": {
-      "description": "Vincula este proyecto a una organización antes de compartir tareas.",
-      "action": "Vincular Proyecto"
-    },
-    "confirmationTitle": "Confirma el uso compartido",
-    "confirmationBody": "Compartir publicará esta tarea en tu espacio de trabajo compartido.",
-    "cancel": "Cancelar",
-    "confirm": "Compartir tarea",
-    "inProgress": "Compartiendo…",
-    "closeButton": "Cerrar"
   },
   "createPrDialog": {
     "title": "Crear Pull Request",
@@ -405,11 +371,14 @@
       "desktopView": "Vista de escritorio",
       "mobileView": "Vista móvil (390x844)",
       "responsiveView": "Vista adaptable (redimensionable)",
-      "startDevServer": "Iniciar servidor de desarrollo"
+      "startDevServer": "Iniciar servidor de desarrollo",
+      "submitUrl": "Enviar URL"
     },
     "loading": {
       "startingServer": "Iniciando servidor de desarrollo...",
-      "waitingForServer": "Esperando servidor..."
+      "waitingForServer": "Esperando servidor...",
+      "loadingPreview": "Cargando vista previa...",
+      "manualUrlHint": "No se detectó ninguna URL aún. Puedes ingresar una URL manualmente en la barra de herramientas de arriba."
     },
     "troubleAlert": {
       "item1": "¿Se inició correctamente el servidor de desarrollo? Puede haber un error que necesites resolver, o quizás sea necesario instalar dependencias.",
@@ -479,6 +448,11 @@
   "todos": {
     "title_one": "Todos ({{count}})",
     "title_other": "Todos ({{count}})"
+  },
+  "todoPopup": {
+    "title": "Tareas",
+    "progress": "{{completed}}/{{total}} completadas",
+    "noTasks": "Sin tareas"
   },
   "projects": {
     "create": {
@@ -585,6 +559,9 @@
       "continueEditing": "Continuar Editando",
       "discardChanges": "Descartar Cambios"
     }
+  },
+  "terminal": {
+    "selectWorkspace": "Selecciona un espacio de trabajo para abrir terminal"
   },
   "restoreLogsDialog": {
     "title": "Confirmar Reintento",

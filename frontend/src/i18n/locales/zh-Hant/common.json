@@ -12,7 +12,13 @@
     "connect": "連線",
     "disconnect": "中斷連線",
     "close": "關閉",
-    "replay": "重播"
+    "replay": "重播",
+    "discard": "放棄",
+    "addItem": "新增項目"
+  },
+  "form": {
+    "notSpecified": "未指定",
+    "selectOption": "選擇一個選項..."
   },
   "states": {
     "loading": "載入中...",
@@ -134,6 +140,10 @@
     "viewArchive": "檢視封存",
     "backToActive": "返回活躍",
     "noArchived": "沒有已封存的工作區",
+    "noWorkspaces": "沒有工作區",
+    "needsAttention": "需要關注",
+    "idle": "閒置",
+    "running": "執行中",
     "pin": "釘選",
     "unpin": "取消釘選",
     "archive": "封存",
@@ -152,7 +162,9 @@
     "noResults": "沒有匹配的檔案",
     "title": "檔案",
     "showGitHubComments": "顯示 GitHub 評論",
-    "hideGitHubComments": "隱藏 GitHub 評論"
+    "hideGitHubComments": "隱藏 GitHub 評論",
+    "prevGitHubComment": "上一個有評論的檔案",
+    "nextGitHubComment": "下一個有評論的檔案"
   },
   "sections": {
     "changes": "變更",
@@ -165,7 +177,13 @@
     "workingBranch": "工作分支",
     "recent": "最近",
     "other": "其他",
-    "devServerPreview": "開發伺服器預覽"
+    "devServerPreview": "開發伺服器預覽",
+    "terminal": "終端機",
+    "notes": "筆記"
+  },
+  "notes": {
+    "placeholder": "新增關於此工作區的筆記...",
+    "selectWorkspace": "選擇一個工作區以查看筆記"
   },
   "repos": {
     "loading": "正在載入儲存庫...",
@@ -183,16 +201,22 @@
     "repoSettings": "儲存庫設定",
     "cancel": "取消",
     "saveChanges": "儲存變更",
-    "copied": "已複製"
+    "copied": "已複製",
+    "collapse": "收起"
   },
   "comments": {
     "addReviewComment": "新增審查評論",
     "addPlaceholder": "新增評論...",
-    "editPlaceholder": "編輯評論..."
+    "editPlaceholder": "編輯評論...",
+    "copyToReview": "複製到審查"
   },
   "confirm": {
     "defaultConfirm": "確認",
     "defaultCancel": "取消"
+  },
+  "dialogs": {
+    "selectGitRepository": "選擇 Git 儲存庫",
+    "chooseExistingRepo": "從檔案系統中選擇現有儲存庫"
   },
   "empty": {
     "noChanges": "沒有要顯示的變更"
@@ -203,7 +227,8 @@
     "defaultPlaceholder": "輸入命令或搜尋..."
   },
   "chatBox": {
-    "variants": "變體"
+    "variants": "變體",
+    "customise": "自訂"
   },
   "projects": {
     "noProjectFound": "找不到專案",
@@ -274,10 +299,17 @@
     "selectProcessToView": "選擇一個程序以查看日誌"
   },
   "processes": {
-    "noProcesses": "無程序"
+    "noProcesses": "無程序",
+    "terminal": "終端機"
   },
   "search": {
     "matchCount": "{{current}} / {{total}}",
     "noMatches": "無匹配項"
+  },
+  "contextUsage": {
+    "label": "上下文使用量",
+    "emptyTooltip": "上下文使用量將在下一次回覆後顯示",
+    "tooltip": "上下文：{{percentage}}% · {{used}} / {{total}} tokens",
+    "ariaLabel": "上下文使用量：{{percentage}}%"
   }
 }
