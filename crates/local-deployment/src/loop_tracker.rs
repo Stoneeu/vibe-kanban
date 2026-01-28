@@ -19,7 +19,7 @@ pub struct CopilotLoopState {
     pub max_iterations: u32,
     /// String that signals task completion (e.g., '<promise>COMPLETE</promise>')
     pub completion_promise: Option<String>,
-    /// Original prompt to append "繼續" for follow-up
+    /// Original prompt to append "continue" for follow-up
     pub original_prompt: String,
     /// Session ID from the Copilot executor
     pub session_id: String,
@@ -40,9 +40,9 @@ impl CopilotLoopState {
         self.iteration += 1;
     }
 
-    /// Build the follow-up prompt by appending "繼續" to original prompt
+    /// Build the follow-up prompt by appending "continue" to original prompt
     pub fn build_follow_up_prompt(&self) -> String {
-        format!("{}\n\n繼續", self.original_prompt)
+        format!("{}\n\ncontinue", self.original_prompt)
     }
 }
 
@@ -218,6 +218,6 @@ mod tests {
             executor_profile_id: ExecutorProfileId::new(BaseCodingAgent::Copilot),
             working_dir: None,
         };
-        assert_eq!(state.build_follow_up_prompt(), "Build the feature\n\n繼續");
+        assert_eq!(state.build_follow_up_prompt(), "Build the feature\n\ncontinue");
     }
 }

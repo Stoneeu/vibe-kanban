@@ -976,6 +976,22 @@ impl LocalContainerService {
         ctx: &ExecutionContext,
         exec_id: &Uuid,
     ) -> bool {
+        // Check if execution was stopped or failed - if so, cancel the loop
+        if matches!(
+            ctx.execution_process.status,
+            ExecutionProcessStatus::Killed | ExecutionProcessStatus::Failed
+        ) {
+            if self.loop_tracker.has_active_loop(&ctx.workspace.id).await {
+                tracing::info!(
+                    "Copilot loop cancelled: execution was {:?} for workspace {}",
+                    ctx.execution_process.status,
+                    ctx.workspace.id
+                );
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+            }
+            return false;
+        }
+
         // Check if we have an active loop for this workspace
         if !self.loop_tracker.has_active_loop(&ctx.workspace.id).await {
             return false;
@@ -1409,6 +1425,18 @@ impl ContainerService for LocalContainerService {
 
         ExecutionProcess::update_completion(&self.db.pool, execution_process.id, status, exit_code)
             .await?;
+
+        // Clear Copilot loop state if this execution is being stopped
+        // This prevents the loop from continuing after user-initiated stop
+        if let Ok(ctx) = ExecutionProcess::load_context(&self.db.pool, execution_process.id).await {
+            if self.loop_tracker.has_active_loop(&ctx.workspace.id).await {
+                tracing::info!(
+                    "Clearing Copilot loop state for workspace {} due to stop_execution",
+                    ctx.workspace.id
+                );
+                self.loop_tracker.remove(&ctx.workspace.id).await;
+            }
+        }
 
         // Try graceful interrupt first, then force kill
         if let Some(interrupt_sender) = self.take_interrupt_sender(&execution_process.id).await {
