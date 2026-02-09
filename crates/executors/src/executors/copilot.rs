@@ -34,6 +34,28 @@ pub struct Copilot {
     pub add_dir: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_mcp_server: Option<Vec<String>>,
+
+    #[schemars(
+        title = "Loop Enabled",
+        description = "Enable automatic loop until task completion"
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loop_enabled: Option<bool>,
+
+    #[schemars(
+        title = "Max Iterations",
+        description = "Maximum number of loop iterations (default: 5, max: 100)"
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_iterations: Option<u32>,
+
+    #[schemars(
+        title = "Completion Promise",
+        description = "Exact string that signals task completion (e.g., '<promise>COMPLETE</promise>')"
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_promise: Option<String>,
+
     #[serde(flatten)]
     pub cmd: CmdOverrides,
     #[serde(skip)]

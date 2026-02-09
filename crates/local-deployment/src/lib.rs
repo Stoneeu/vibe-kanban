@@ -35,6 +35,7 @@ use crate::{container::LocalContainerService, pty::PtyService};
 mod command;
 pub mod container;
 mod copy;
+pub mod loop_tracker;
 pub mod pty;
 
 #[derive(Clone)]

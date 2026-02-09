@@ -53,6 +53,32 @@
         "type": "string"
       }
     },
+    "loop_enabled": {
+      "title": "Loop Enabled",
+      "description": "Enable automatic loop until task completion",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "max_iterations": {
+      "title": "Max Iterations",
+      "description": "Maximum number of loop iterations (default: 5, max: 100)",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "completion_promise": {
+      "title": "Completion Promise",
+      "description": "Exact string that signals task completion (e.g., '<promise>COMPLETE</promise>')",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "base_command_override": {
       "title": "Base Command Override",
       "description": "Override the base command with a custom command",
