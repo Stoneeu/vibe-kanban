@@ -36,7 +36,7 @@ use executors::{
     env::{ExecutionEnv, RepoContext},
     executors::{BaseCodingAgent, CancellationToken, CodingAgent, ExecutorExitResult, ExecutorExitSignal},
     logs::{NormalizedEntryType, utils::patch::extract_normalized_entry_from_patch},
-    profile::{ExecutorConfigs, ExecutorProfileId},
+    profile::ExecutorConfigs,
 };
 use futures::{FutureExt, TryStreamExt, stream::select};
 use git::GitService;
@@ -1108,6 +1108,7 @@ impl LocalContainerService {
         let action_type = ExecutorActionType::CodingAgentFollowUpRequest(CodingAgentFollowUpRequest {
             prompt: follow_up_prompt,
             session_id,
+            reset_to_message_id: None,
             executor_profile_id: state.executor_profile_id.clone(),
             working_dir: state.working_dir.clone(),
         });
