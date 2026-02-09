@@ -4,27 +4,21 @@
 
 ---
 
-## 🚀 快速開始 (TL;DR)
-
+##
 ```bash
-# 設定編譯環境
 export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/gcc/x86_64-linux-gnu/9/include"
 sudo apt install gcc-10 g++-10
 export CC=gcc-10
 export CXX=g++-10
-
-# 編譯 Release 版本
 cargo build --bin server --release
-
-# 進入前端目錄並編譯
+# 進入前端目錄
 cd frontend && pnpm install && pnpm run build && cd ..
 
-# 啟動伺服器
+# 開發模式啟動（指定端口）
+VITE_BACKEND_URL=http://localhost:9999 pnpm run dev -- --port 3000 --host 0.0.0.0
+
 HOST=0.0.0.0 PORT=9998 RUST_LOG=debug ./target/release/server
 ```
-
----
-
 
 ## ⚠️ 重要概念：Debug vs Release 資料目錄差異
 

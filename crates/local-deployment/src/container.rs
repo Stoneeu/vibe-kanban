@@ -36,7 +36,7 @@ use executors::{
     env::{ExecutionEnv, RepoContext},
     executors::{BaseCodingAgent, CancellationToken, CodingAgent, ExecutorExitResult, ExecutorExitSignal},
     logs::{NormalizedEntryType, utils::patch::extract_normalized_entry_from_patch},
-    profile::ExecutorConfigs,
+    profile::{ExecutorConfigs, ExecutorProfileId},
 };
 use futures::{FutureExt, TryStreamExt, stream::select};
 use git::GitService;
