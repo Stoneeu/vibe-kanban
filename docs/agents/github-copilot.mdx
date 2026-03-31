@@ -1,8 +1,37 @@
 ---
 title: "GitHub Copilot"
-description: "Set up GitHub Copilot CLI"
+description: "Set up GitHub Copilot CLI — ACP mode and Legacy CLI mode"
 icon: https://www.vibekanban.com/images/logos/github-copilot-logo.svg
 ---
+
+Vibe Kanban supports two distinct GitHub Copilot executor modes. Both connect
+to the same Copilot CLI package (`@github/copilot`) but differ in how they
+communicate with the running process.
+
+| | **Copilot (ACP)** | **Copilot CLI (Legacy)** |
+|-|-|-|
+| Internal key | `COPILOT` | `COPILOT_CLI` |
+| Transport | ACP protocol over child-process stdio | Direct stdin/stdout plain text |
+| Session management | ACP session persistence (JSONL) | `--resume <session_id>` flag; session ID discovered from `--log-dir` log files |
+| Prompt delivery | ACP message framing | Raw bytes written to stdin, then EOF |
+| Follow-up | ACP fork + resume prompt | `--resume <session_id>` + stdin prompt |
+| Approval flow | ACP `request_permission()` channel (wired via `AcpAgentHarness`) | No approval channel — runs with `NoopExecutorApprovalService` |
+| CLI flags | `--acp` (always appended) | `--no-color --log-level debug --log-dir <dir>` (no `--acp`) |
+| Log normalisation | ACP-native log normaliser (`acp::normalize_logs`) | `PlainTextLogProcessor` + ANSI stripping; session-id lines intercepted via `[copilot-session]` prefix |
+| UI parameters | Model, permission policy (Auto / Supervised) | Same model list & permission policies |
+| MCP config | `~/.copilot/mcp-config.json` | `~/.copilot/mcp-config.json` (shared) |
+
+## When to use which mode
+
+- **Copilot (ACP)** — the default. Use this for the standard, actively
+  maintained integration. It benefits from structured ACP messaging, richer
+  session management, and future approval-flow improvements.
+
+- **Copilot CLI (Legacy)** — use this when you need the classic stdin/stdout
+  interaction model, when debugging transport-level issues, or when running an
+  older Copilot CLI version that does not support the `--acp` flag.
+
+## Quick start
 
 <Steps>
 <Step title="Run GitHub Copilot">
@@ -22,6 +51,27 @@ icon: https://www.vibekanban.com/images/logos/github-copilot-logo.svg
   npx vibe-kanban
   ```
 
-  You can now select GitHub Copilot when creating task attempts.
+  You can now select **GitHub Copilot** (ACP) or **Copilot CLI** (Legacy) when
+  creating task attempts.
 </Step>
 </Steps>
+
+## Configuration reference
+
+Both executors accept the same optional fields in their profile JSON:
+
+| Field | Type | Description |
+|-|-|-|
+| `model` | `string` | Model ID (e.g. `gpt-5.4`, `claude-sonnet-4.6`) |
+| `allow_all_tools` | `bool` | Maps to `--allow-all-tools` |
+| `allow_tool` | `string` | Maps to `--allow-tool <name>` |
+| `deny_tool` | `string` | Maps to `--deny-tool <name>` |
+| `add_dir` | `string[]` | Additional working directories (`--add-dir`) |
+| `disable_mcp_server` | `string[]` | Disable specific MCP servers |
+| `append_prompt` | `object` | Extra text appended to every prompt |
+
+The **ACP** executor additionally carries an internal `approvals` handle (not
+user-configurable) that is wired at container startup.
+
+The **Legacy CLI** executor does **not** expose an approval handle — it always
+runs in an auto-approve–equivalent mode (`NoopExecutorApprovalService`).

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "append_prompt": {
+      "title": "Append Prompt",
+      "description": "Extra text appended to the prompt",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "textarea",
+      "default": null
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "allow_all_tools": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "allow_tool": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deny_tool": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "add_dir": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "disable_mcp_server": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "base_command_override": {
+      "title": "Base Command Override",
+      "description": "Override the base command with a custom command",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "additional_params": {
+      "title": "Additional Parameters",
+      "description": "Additional parameters to append to the base command",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "env": {
+      "title": "Environment Variables",
+      "description": "Environment variables to set when running the executor",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "description": "Copilot CLI executor — legacy direct-process mode (stdin prompt, `--resume`\nsession management, log-dir based session discovery).\n\nThis executor intentionally does **not** use the ACP shared harness.  It\nspawns the Copilot CLI as a child process, writes the prompt to stdin, and\nreads normalised output from stdout.  Session follow-up is handled via the\n`--resume <session_id>` flag, and the session id is discovered by scanning\nthe temporary log directory for `<UUID>.log` files.\n\nThe struct mirrors the serialisable fields of the ACP-based [`super::copilot::Copilot`]\nexecutor but omits the `approvals` field because the legacy stdio path has\nno ACP `request_permission()` channel.",
+  "type": "object"
+}

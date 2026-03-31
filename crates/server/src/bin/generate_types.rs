@@ -227,6 +227,7 @@ fn generate_types_content() -> String {
         executors::executors::codex::ReasoningSummaryFormat::decl(),
         executors::executors::cursor::CursorAgent::decl(),
         executors::executors::copilot::Copilot::decl(),
+        executors::executors::copilot_cli::CopilotCli::decl(),
         executors::executors::opencode::Opencode::decl(),
         executors::executors::qwen::QwenCode::decl(),
         executors::executors::droid::Droid::decl(),
@@ -351,6 +352,10 @@ fn generate_schemas() -> Result<HashMap<&'static str, String>, serde_json::Error
         (
             "copilot",
             generate_json_schema::<executors::executors::copilot::Copilot>()?,
+        ),
+        (
+            "copilot_cli",
+            generate_json_schema::<executors::executors::copilot_cli::CopilotCli>()?,
         ),
         (
             "droid",

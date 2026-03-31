@@ -27,6 +27,8 @@ export function getAgentName(
       return 'Qwen';
     case BaseCodingAgent.COPILOT:
       return 'Copilot';
+    case BaseCodingAgent.COPILOT_CLI:
+      return 'Copilot CLI';
     case BaseCodingAgent.DROID:
       return 'Droid';
   }
@@ -68,6 +70,7 @@ export function AgentIcon({ agent, className = 'h-4 w-4' }: AgentIconProps) {
       iconPath = `/agents/qwen${suffix}.svg`;
       break;
     case BaseCodingAgent.COPILOT:
+    case BaseCodingAgent.COPILOT_CLI:
       iconPath = `/agents/copilot${suffix}.svg`;
       break;
     case BaseCodingAgent.DROID:
