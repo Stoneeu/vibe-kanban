@@ -1,0 +1,206 @@
+---
+title: "Developer Handbook"
+description: "Get oriented in the Vibe Kanban repository, understand the local and remote runtimes, and learn the commands you need for everyday development."
+sidebarTitle: "Developer Handbook"
+---
+
+If you are new to the repository, start here. This handbook explains how the codebase is split, where to make common changes, and which commands to run before you hand work back.
+
+<Info>
+This page is for contributors. If you only want to use the product, start with [Get Started](/getting-started).
+</Info>
+
+## Start with the right mental model
+
+Vibe Kanban is a mono-repo with two main runtimes plus a shared front-end and type layer.
+
+```text
+Local runtime
+├─ crates/server               Local Axum server and preview proxy bootstrap
+├─ crates/local-deployment     Local Deployment implementation
+├─ packages/local-web          Local React application
+├─ packages/web-core           Shared front-end features
+└─ packages/ui                 Shared UI primitives
+
+Remote runtime
+├─ crates/remote               Hosted API, ElectricSQL proxy, and SPA serving
+├─ packages/remote-web         Hosted React application
+└─ shared/remote-types.ts      Generated TypeScript for remote APIs and shapes
+
+Shared infrastructure
+├─ crates/db                   Local SQLite models and migrations
+├─ crates/services             Cross-cutting services used by deployments
+├─ crates/executors            Coding-agent integrations, profiles, logs, and model selection
+├─ crates/git                  Git operations and validation
+├─ crates/worktree-manager     Git worktree lifecycle
+├─ crates/workspace-manager    Workspace lifecycle
+├─ shared/types.ts             Generated TypeScript for the local app
+├─ scripts/                    Dev environment helpers
+├─ npx-cli/                    Published `npx vibe-kanban` package
+└─ docs/                       Mintlify documentation site
+```
+
+## First-time setup
+
+<Steps>
+<Step title="Install the prerequisites">
+Install the toolchain this repository expects:
+- Rust `nightly-2025-12-04` from `rust-toolchain.toml`
+- Node.js 20 or newer
+- pnpm `10.13.1` via `corepack enable`
+
+For local backend work, also install `cargo-watch`:
+
+```bash
+cargo install cargo-watch
+corepack enable
+```
+</Step>
+
+<Step title="Install workspace dependencies">
+```bash
+pnpm i
+```
+</Step>
+
+<Step title="Run the local stack">
+```bash
+pnpm run dev
+```
+
+This command allocates frontend, backend, and preview-proxy ports; copies `dev_assets_seed/` into `dev_assets/` on first run; starts `cargo watch` for the local Rust backend; and starts Vite for `packages/local-web`.
+</Step>
+
+<Step title="Run the hosted stack when you need it">
+If you are changing cloud behaviour, follow [Local Development](/self-hosting/local-development) and then start the remote stack:
+
+```bash
+pnpm run remote:dev
+```
+</Step>
+</Steps>
+
+<Check>
+When `pnpm run dev` is healthy, you should have a Rust backend, a Vite frontend, and a separate preview proxy running together.
+</Check>
+
+## How the local runtime fits together
+
+When you run `pnpm run dev`, the main path is:
+
+1. `scripts/setup-dev-environment.js` picks or reuses ports and seeds `dev_assets/`.
+2. `crates/server/src/main.rs` starts the main Axum server and a second listener for the preview proxy.
+3. `crates/server/src/lib.rs` points `DeploymentImpl` at `local_deployment::LocalDeployment`.
+4. `crates/local-deployment/src/lib.rs` wires together the database, git, file system, container service, approvals, queueing, preview proxy, remote client hooks, relay components, and workspace management.
+5. `packages/local-web/src/app/entry/Bootstrap.tsx` boots the React app, React Query, auth runtime, Sentry, PostHog, and the TanStack Router tree.
+
+If you are debugging embedded previews, look at `crates/preview-proxy`. It runs on its own port and isolates preview traffic from the main application server.
+
+## How the hosted runtime differs
+
+The hosted stack lives in `crates/remote` and `packages/remote-web`.
+
+- `crates/remote` serves the REST API under `/v1/*`
+- it proxies ElectricSQL reads under `/shape/*`
+- it serves the built `packages/remote-web` SPA from `/srv/static`
+- `packages/remote-web/src/app/entry/Bootstrap.tsx` boots the hosted React app and configures the remote and relay API bases
+
+<Warning>
+Keep ElectricSQL behind the auth-gated proxy. Do not expose it directly to the browser client.
+</Warning>
+
+## Choose the right directory before you edit
+
+| If you want to change... | Start here | Why |
+| --- | --- | --- |
+| Local app UI or routes | `packages/local-web/src` | This is the app-specific shell for the local runtime. |
+| Front-end logic shared by local and remote | `packages/web-core/src` | This package holds shared features, routes, styles, integrations, and state. |
+| Reusable UI primitives | `packages/ui/src` | Shared components used across both frontends live here. |
+| Local backend behaviour or desktop workflow | `crates/server/src` and `crates/local-deployment/src` | The server boots the local runtime and the deployment layer wires its services together. |
+| Hosted API, auth, or sync behaviour | `crates/remote/src` | This crate owns the cloud API, ElectricSQL proxy, and hosted app integration. |
+| Git/worktree/workspace lifecycle | `crates/git`, `crates/worktree-manager`, `crates/workspace-manager` | These crates handle repo operations and workspace orchestration. |
+| Coding agent integrations or executor settings | `crates/executors/src` | Agent definitions, logs, profiles, and model selection live here. |
+| Database models or migrations | `crates/db` for local, `crates/remote` for hosted | Local uses SQLite through SQLx; the hosted stack has its own migrations and offline data flow. |
+| Documentation | `docs/*.mdx` and `docs/docs.json` | Docs pages are Mintlify MDX, and navigation is defined in `docs/docs.json`. |
+
+## Shared types and generated files
+
+The repository uses `ts-rs` to derive TypeScript definitions from Rust types.
+
+| Output | Source of truth | Generate with |
+| --- | --- | --- |
+| `shared/types.ts` | Rust types referenced by `crates/server/src/bin/generate_types.rs` | `pnpm run generate-types` |
+| `shared/remote-types.ts` | Rust types and shape definitions referenced by `crates/remote/src/bin/generate_types.rs` | `pnpm run remote:generate-types` |
+
+<Warning>
+Do not edit `shared/types.ts` or `shared/remote-types.ts` by hand. Change the Rust source types, then regenerate the file.
+</Warning>
+
+## Commands you will use most often
+
+| Command | Use it when you need to... |
+| --- | --- |
+| `pnpm run dev` | Start the main local development stack. |
+| `pnpm run backend:dev:watch` | Run only the local Rust backend with live reload. |
+| `pnpm run local-web:dev` | Run only the local Vite frontend. |
+| `pnpm run remote:dev` | Start the hosted/cloud stack locally. |
+| `pnpm run check` | Run TypeScript and Rust type checks across the repo. |
+| `pnpm run lint` | Run ESLint, Clippy, and the unused i18n-key check. |
+| `pnpm run format` | Format Rust and front-end code. |
+| `cargo test --workspace` | Run the Rust test suite. |
+| `pnpm run prepare-db` | Refresh local SQLx offline data after local DB query or migration changes. |
+| `pnpm run remote:prepare-db` | Refresh hosted SQLx offline data after remote DB query or migration changes. |
+| `pnpm run build:npx` | Build the local distributable CLI package. |
+
+## Common gotchas
+
+- Ports are intentionally dynamic. `scripts/setup-dev-environment.js` stores them in `.dev-ports.json`, reuses them when possible, and respects `PORT` when you want to shift the whole stack.
+- If ports get stuck, reset them with:
+
+  ```bash
+  node scripts/setup-dev-environment.js clear
+  ```
+
+- `dev_assets/` is disposable local state. Delete it if you want a clean local reset; change `dev_assets_seed/` if you want new committed defaults.
+- The local frontend proxies `/api` to the backend port in `packages/local-web/vite.config.ts`. If you override ports or origins, make sure `VK_ALLOWED_ORIGINS` still matches the frontend origin.
+- The preview proxy is separate from the main backend. If previews fail but the app API still works, inspect `crates/preview-proxy` before you chase unrelated frontend bugs.
+- Remote `VITE_*` values are build-time configuration. If you change them for the hosted stack, rebuild or restart the remote app path rather than expecting live runtime pickup.
+
+## Before you hand work off
+
+<Steps>
+<Step title="Format your changes">
+```bash
+pnpm run format
+```
+</Step>
+
+<Step title="Check types and compile paths">
+```bash
+pnpm run check
+```
+</Step>
+
+<Step title="Run linting">
+```bash
+pnpm run lint
+```
+</Step>
+
+<Step title="Run tests for backend changes">
+```bash
+cargo test --workspace
+```
+</Step>
+
+<Step title="Regenerate derived artefacts when needed">
+If you changed shared Rust types, run `pnpm run generate-types` and, when relevant, `pnpm run remote:generate-types`.
+
+If you changed SQLx queries or migrations, run `pnpm run prepare-db` and, when relevant, `pnpm run remote:prepare-db`.
+</Step>
+</Steps>
+
+## Where to go next
+
+- [Local Development](/self-hosting/local-development) for the hosted/cloud stack
+- [Troubleshooting](/troubleshooting) for common environment and logging issues

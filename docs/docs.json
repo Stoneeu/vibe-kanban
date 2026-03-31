@@ -109,6 +109,12 @@
         ]
       },
       {
+        "group": "Developers",
+        "pages": [
+          "developer-handbook"
+        ]
+      },
+      {
         "group": "Integrations",
         "pages": [
           "integrations/github-integration",
