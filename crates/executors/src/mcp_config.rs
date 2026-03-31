@@ -402,7 +402,7 @@ impl CodingAgent {
             CodingAgent::CursorAgent(_) => Cursor,
             CodingAgent::Codex(_) => Codex,
             CodingAgent::Opencode(_) => Opencode,
-            CodingAgent::Copilot(..) => Copilot,
+            CodingAgent::Copilot(..) | CodingAgent::CopilotCli(_) => Copilot,
             #[cfg(feature = "qa-mode")]
             CodingAgent::QaMock(_) => Passthrough, // QA mock doesn't need MCP
         };

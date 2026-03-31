@@ -1332,7 +1332,17 @@ impl ContainerService for LocalContainerService {
                     self.notification_service.clone(),
                     execution_process.id,
                 ),
-                _ => Arc::new(NoopExecutorApprovalService {}),
+                // Copilot (ACP) and CopilotCli (legacy stdio) intentionally use
+                // NoopExecutorApprovalService — neither surfaces an interactive
+                // approval path today.
+                Some(
+                    BaseCodingAgent::Copilot
+                    | BaseCodingAgent::CopilotCli
+                    | BaseCodingAgent::Amp
+                    | BaseCodingAgent::CursorAgent
+                    | BaseCodingAgent::Droid,
+                )
+                | None => Arc::new(NoopExecutorApprovalService {}),
             };
 
         let repos = WorkspaceRepo::find_repos_for_workspace(&self.db.pool, workspace.id).await?;

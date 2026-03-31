@@ -57,6 +57,13 @@
         }
       }
     },
+    "COPILOT_CLI": {
+      "DEFAULT": {
+        "COPILOT_CLI": {
+          "allow_all_tools": true
+        }
+      }
+    },
     "DROID": {
       "DEFAULT": {
         "DROID": {

@@ -85,6 +85,70 @@ pub fn spawn_local_output_process()
     Ok((spawned, writer))
 }
 
+/// Replace the child's stdout with a merged pipe.  A background task copies
+/// the *real* child stdout through the pipe so that downstream consumers
+/// (e.g. [`MsgStore`]) still see the original output.  The returned writer
+/// lets the caller inject extra lines — such as session-id markers — into
+/// the same stream.
+///
+/// On drop of *both* writers (the tee task's copy **and** the returned
+/// injection writer) the pipe is closed, signalling EOF to the reader.
+pub fn tee_stdout_with_line_injector(
+    child: &mut AsyncGroupChild,
+) -> Result<impl AsyncWrite + Send + Unpin + 'static, ExecutorError> {
+    // 1. Grab the real stdout
+    let real_stdout = child
+        .inner()
+        .stdout
+        .take()
+        .ok_or_else(|| ExecutorError::Io(std::io::Error::other("child stdout not piped")))?;
+
+    // 2. Create a new pipe for the merged output
+    let (pipe_reader, pipe_writer) = os_pipe::pipe().map_err(|e| {
+        ExecutorError::Io(std::io::Error::other(format!("Failed to create pipe: {e}")))
+    })?;
+
+    // 3. Replace child.stdout so downstream reads from the merged pipe
+    child.inner().stdout = Some(wrap_fd_as_child_stdout(pipe_reader)?);
+
+    // 4. Dup the write-end: one copy for the tee task, one for the caller
+    #[cfg(unix)]
+    let (tee_writer, inject_writer) = {
+        let raw_fd = pipe_writer.into_raw_fd();
+        // Safety: raw_fd is valid and exclusively owned (PipeWriter consumed).
+        let file = unsafe { std::fs::File::from_raw_fd(raw_fd) };
+        let file_clone = file.try_clone().map_err(ExecutorError::Io)?;
+        (
+            tokio::fs::File::from_std(file),
+            tokio::fs::File::from_std(file_clone),
+        )
+    };
+
+    #[cfg(windows)]
+    let (tee_writer, inject_writer) = {
+        let raw_handle = pipe_writer.into_raw_handle();
+        // Safety: raw_handle is valid and exclusively owned (PipeWriter consumed).
+        let file = unsafe { std::fs::File::from_raw_handle(raw_handle) };
+        let file_clone = file.try_clone().map_err(ExecutorError::Io)?;
+        (
+            tokio::fs::File::from_std(file),
+            tokio::fs::File::from_std(file_clone),
+        )
+    };
+
+    // 5. Background task: copy real stdout → tee_writer
+    //    When the child exits and its stdout closes, the copy finishes and
+    //    tee_writer is dropped.  The merged pipe stays open until the
+    //    injection writer (returned to the caller) is also dropped.
+    tokio::spawn(async move {
+        let mut src = real_stdout;
+        let mut dst = tee_writer;
+        let _ = tokio::io::copy(&mut src, &mut dst).await;
+    });
+
+    Ok(inject_writer)
+}
+
 // =========================================
 // OS file descriptor helper functions
 // =========================================
