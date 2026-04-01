@@ -63,6 +63,36 @@ function savePorts(ports) {
   }
 }
 
+function handleCliError(error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+}
+
+async function assertPortsAvailable(ports) {
+  const availability = await Promise.all([
+    isPortAvailable(ports.frontend),
+    isPortAvailable(ports.backend),
+    isPortAvailable(ports.preview_proxy),
+  ]);
+
+  const unavailablePorts = [
+    ["frontend", ports.frontend, availability[0]],
+    ["backend", ports.backend, availability[1]],
+    ["preview_proxy", ports.preview_proxy, availability[2]],
+  ].filter(([, , available]) => !available);
+
+  if (unavailablePorts.length === 0) {
+    return;
+  }
+
+  const portList = unavailablePorts
+    .map(([name, port]) => `${name}:${port}`)
+    .join(", ");
+  throw new Error(
+    `Requested dev ports are already in use (${portList}). Stop the conflicting process or choose a different PORT.`
+  );
+}
+
 /**
  * Verify that saved ports are still available
  */
@@ -104,6 +134,7 @@ async function allocatePorts() {
       console.log(`Preview Proxy: ${ports.preview_proxy}`);
     }
 
+    await assertPortsAvailable(ports);
     return ports;
   }
 
@@ -206,7 +237,7 @@ if (require.main === module) {
         .then((ports) => {
           console.log(JSON.stringify(ports));
         })
-        .catch(console.error);
+        .catch(handleCliError);
       break;
 
     case "clear":
@@ -218,7 +249,7 @@ if (require.main === module) {
         .then((ports) => {
           console.log(JSON.stringify(ports.frontend, null, 2));
         })
-        .catch(console.error);
+        .catch(handleCliError);
       break;
 
     case "backend":
@@ -226,7 +257,7 @@ if (require.main === module) {
         .then((ports) => {
           console.log(JSON.stringify(ports.backend, null, 2));
         })
-        .catch(console.error);
+        .catch(handleCliError);
       break;
 
     case "preview_proxy":
@@ -234,7 +265,7 @@ if (require.main === module) {
         .then((ports) => {
           console.log(JSON.stringify(ports.preview_proxy, null, 2));
         })
-        .catch(console.error);
+        .catch(handleCliError);
       break;
 
     default:

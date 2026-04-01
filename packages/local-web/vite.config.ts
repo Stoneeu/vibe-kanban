@@ -23,7 +23,9 @@ function createFilteredLogger() {
     if (isProxyError) {
       const now = Date.now();
       if (now - lastRestartLog > DEBOUNCE_MS) {
-        logger.warn("Proxy connection closed, auto-reconnecting...");
+        logger.warn(
+          "Local backend is not ready yet; proxy will auto-reconnect..."
+        );
         lastRestartLog = now;
       }
       return;
@@ -128,11 +130,13 @@ export default defineConfig({
     ],
   },
   server: {
+    host: process.env.HOST || undefined,
     port: parseInt(process.env.FRONTEND_PORT || '3000'),
+    strictPort: Boolean(process.env.FRONTEND_PORT || process.env.PORT),
     proxy: {
       '/api': {
         target: `http://localhost:${process.env.BACKEND_PORT || '3001'}`,
-        changeOrigin: true,
+        changeOrigin: false,
         ws: true,
       },
     },

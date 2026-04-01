@@ -95,7 +95,20 @@ async fn auth_methods(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<AuthMethodsResponse>>, ApiError> {
     let client = deployment.remote_client()?;
-    let methods = client.auth_methods().await?;
+    let methods = match client.auth_methods().await {
+        Ok(m) => m,
+        Err(e) => {
+            // Older remote servers (< 0.1.37) may not have /v1/auth/methods.
+            // Their SPA catch-all returns HTML for unknown routes, which causes
+            // a deserialization error. Fall back to default OAuth providers so
+            // the sign-in page can still render.
+            tracing::warn!("Failed to fetch auth methods from remote, using fallback: {e}");
+            AuthMethodsResponse {
+                local_auth_enabled: false,
+                oauth_providers: vec!["github".into(), "google".into()],
+            }
+        }
+    };
     Ok(ResponseJson(ApiResponse::success(methods)))
 }
 
